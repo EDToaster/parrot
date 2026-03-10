@@ -1,0 +1,12 @@
+# Hive configuration
+# How long (seconds) before an agent with no heartbeat is considered stalled
+stall_timeout_seconds: 300
+
+# Maximum retry attempts for failed agents
+max_retries: 2
+
+# Command to run for verification after merges (uncomment to enable)
+# verify_command: "cargo test --all-targets && cargo clippy --all-targets -- -D warnings"
+
+# Maximum budget in USD for a single run (uncomment to enable)
+# budget_usd: 50.0
