@@ -19,12 +19,10 @@ object ParrotEngine {
         val subMgr = SubscriptionManager()
         val registry = createCommandRegistry(subMgr)
         val queue = CommandQueue(registry)
-
         subscriptionManager.set(subMgr)
         commandQueue.set(queue)
         platformBridge.set(bridge)
         bridge.registerEventListeners(subMgr)
-
         val wsServer = ParrotWebSocketServer(queue, subMgr)
         wsServer.start()
         webSocketServer.set(wsServer)
