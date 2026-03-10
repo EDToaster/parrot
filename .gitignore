@@ -9,3 +9,4 @@ build/
 buildSrc/build/
 buildSrc/.gradle/
 runs/
+.hive
