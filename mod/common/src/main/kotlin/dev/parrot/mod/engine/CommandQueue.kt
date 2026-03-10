@@ -1,5 +1,6 @@
 package dev.parrot.mod.engine
 
+import dev.parrot.mod.commands.CommandRegistry
 import dev.parrot.protocol.*
 import io.netty.channel.Channel
 import net.minecraft.server.MinecraftServer
@@ -7,7 +8,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class CommandQueue(
-    private val registry: Any? = null, // CommandRegistry, typed as Any to avoid circular dep during scaffolding
+    private val registry: CommandRegistry,
     private val maxPerTick: Int = 20
 ) {
     private val queue = ConcurrentLinkedQueue<PendingCommand>()
