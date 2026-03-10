@@ -7,7 +7,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class CommandQueue(
-    private val registry: Any? = null, // CommandRegistry, typed as Any to avoid circular dep during scaffolding
+    private val registry: dev.parrot.mod.commands.CommandRegistry,
     private val maxPerTick: Int = 20
 ) {
     private val queue = ConcurrentLinkedQueue<PendingCommand>()
