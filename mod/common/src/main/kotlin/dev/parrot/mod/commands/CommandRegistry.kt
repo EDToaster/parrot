@@ -9,5 +9,8 @@ class CommandRegistry {
 
     fun get(method: String): CommandHandler? = handlers[method]
 
-    fun list(): Collection<String> = handlers.keys
+    fun listMethods(): List<String> = handlers.keys.sorted()
+
+    fun listReadOnlyMethods(): List<String> =
+        handlers.values.filter { it.isReadOnly }.map { it.method }.sorted()
 }

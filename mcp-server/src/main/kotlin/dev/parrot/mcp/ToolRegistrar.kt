@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import java.util.UUID
 
@@ -388,7 +389,33 @@ object ToolRegistrar {
             }
         }
 
-        // 21. list_methods
+        // 21. poll_events
+        server.addTool(
+            name = "poll_events",
+            description = "Drain buffered push events. Optionally filter by subscriptionId.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("subscriptionId") { put("type", "string"); put("description", "Subscription ID to drain events for (omit for all)") }
+                },
+                required = emptyList()
+            )
+        ) { request ->
+            if (!bridge.isConnected) return@addTool notConnectedResult()
+            try {
+                val args = request.arguments ?: JsonObject(emptyMap())
+                val subId = args["subscriptionId"]?.jsonPrimitive?.content
+                val events = bridge.drainEvents(subId)
+                val result = buildJsonObject {
+                    put("count", events.size)
+                    putJsonArray("events") { events.forEach { add(it) } }
+                }
+                CallToolResult(content = listOf(TextContent(result.toString())))
+            } catch (e: Exception) {
+                CallToolResult(content = listOf(TextContent("Error: ${e.message}")), isError = true)
+            }
+        }
+
+        // 22. list_methods
         server.addTool(
             name = "list_methods",
             description = "List all available query and action methods"

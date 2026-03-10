@@ -18,7 +18,7 @@ object ParrotEngine {
     fun start(server: MinecraftServer, bridge: PlatformBridge) {
         val subMgr = SubscriptionManager()
         val registry = createCommandRegistry(subMgr)
-        val queue = CommandQueue(registry)
+        val queue = CommandQueue(registry, bridge)
         subscriptionManager.set(subMgr)
         commandQueue.set(queue)
         platformBridge.set(bridge)

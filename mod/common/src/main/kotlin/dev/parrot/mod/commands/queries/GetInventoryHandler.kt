@@ -47,8 +47,11 @@ class GetInventoryHandler : CommandHandler {
                         })
                     }
                 }
+                val title = context.screenReader?.getCurrentScreen()?.title
+
                 buildJsonObject {
                     put("inventory_type", "screen")
+                    title?.let { put("title", it) }
                     put("size", menu.slots.size)
                     putJsonArray("slots") { slots.forEach { add(it) } }
                 }

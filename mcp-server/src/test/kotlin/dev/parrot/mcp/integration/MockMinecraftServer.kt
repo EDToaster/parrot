@@ -24,6 +24,7 @@ class MockMinecraftServer {
     private val cannedResponses = mutableMapOf<String, JsonObject>()
     val receivedMessages = CopyOnWriteArrayList<ParrotMessage>()
     private var session: WebSocketSession? = null
+    var requiredToken: String? = null
 
     fun registerResponse(method: String, response: JsonObject) {
         cannedResponses[method] = response
@@ -75,6 +76,17 @@ class MockMinecraftServer {
 
         when (message) {
             is Hello -> {
+                val expected = requiredToken
+                if (expected != null && message.authToken != expected) {
+                    val error = ErrorResponse(
+                        id = message.id,
+                        code = "AUTH_FAILED",
+                        message = "Invalid auth token"
+                    )
+                    session.send(Frame.Text(ParrotJson.encodeToString<ParrotMessage>(error)))
+                    session.close(CloseReason(CloseReason.Codes.NORMAL, "Auth failed"))
+                    return
+                }
                 val ack = HelloAck(
                     id = message.id,
                     capabilities = listOf("gui_observation"),
@@ -140,11 +152,29 @@ class MockMinecraftServer {
                 session.send(Frame.Text(ParrotJson.encodeToString<ParrotMessage>(ack)))
             }
 
+            is UnsubscribeRequest -> {
+                val ack = UnsubscribeAck(
+                    id = message.id,
+                    success = true
+                )
+                session.send(Frame.Text(ParrotJson.encodeToString<ParrotMessage>(ack)))
+            }
+
             is Pong -> {
                 // Already recorded in receivedMessages
             }
 
             else -> {}
         }
+    }
+
+    suspend fun sendPushEvent(subscriptionId: String, eventType: String, data: JsonObject) {
+        val event = PushEvent(
+            subscriptionId = subscriptionId,
+            tick = 100L,
+            eventType = eventType,
+            data = data
+        )
+        session?.send(Frame.Text(ParrotJson.encodeToString<ParrotMessage>(event)))
     }
 }

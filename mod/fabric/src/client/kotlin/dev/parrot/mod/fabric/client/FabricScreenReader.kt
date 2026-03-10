@@ -32,6 +32,9 @@ class FabricScreenReader : ScreenReader {
             } catch (_: Exception) { null }
         } else null
 
+        // Spec calls for screen.renderables, but that field is private in Fabric's
+        // MC 1.21.10 mappings. children() is the accessible alternative and returns
+        // the same interactive widgets (buttons, sliders, etc.) as renderables would.
         val widgets = screen.children().filterIsInstance<AbstractWidget>().map { widget ->
             WidgetState(
                 type = widget.javaClass.simpleName,

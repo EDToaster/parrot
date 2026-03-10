@@ -10,6 +10,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MinecraftBridge(private val config: ParrotConfig) {
@@ -18,6 +19,16 @@ class MinecraftBridge(private val config: ParrotConfig) {
 
     private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<JsonObject>>()
     private var session: WebSocketSession? = null
+
+    /**
+     * Buffered push events received from the mod, keyed by subscriptionId.
+     * Each subscription holds at most [MAX_BUFFERED_EVENTS] events (oldest dropped on overflow).
+     */
+    private val eventBuffer = ConcurrentHashMap<String, ConcurrentLinkedDeque<JsonObject>>()
+
+    companion object {
+        private const val MAX_BUFFERED_EVENTS = 200
+    }
     private val client = HttpClient(CIO) {
         install(WebSockets)
     }
@@ -86,6 +97,23 @@ class MinecraftBridge(private val config: ParrotConfig) {
             pendingRequests.remove(message.id)
             throw e
         }
+    }
+
+    /**
+     * Drains all buffered events for the given [subscriptionId], or all subscriptions if null.
+     * Returns the events and removes them from the buffer.
+     */
+    fun drainEvents(subscriptionId: String? = null): List<JsonObject> {
+        if (subscriptionId != null) {
+            val deque = eventBuffer.remove(subscriptionId) ?: return emptyList()
+            return deque.toList()
+        }
+        val all = mutableListOf<JsonObject>()
+        val keys = eventBuffer.keys().toList()
+        for (key in keys) {
+            eventBuffer.remove(key)?.let { all.addAll(it) }
+        }
+        return all.sortedBy { it["tick"]?.jsonPrimitive?.longOrNull ?: 0L }
     }
 
     fun disconnect() {
@@ -204,6 +232,18 @@ class MinecraftBridge(private val config: ParrotConfig) {
 
             is PushEvent -> {
                 System.err.println("[parrot-mcp] Event: ${message.eventType} (sub=${message.subscriptionId})")
+                val event = buildJsonObject {
+                    put("subscriptionId", message.subscriptionId)
+                    put("eventType", message.eventType)
+                    put("tick", message.tick)
+                    put("data", message.data)
+                }
+                val deque = eventBuffer.computeIfAbsent(message.subscriptionId) { ConcurrentLinkedDeque() }
+                deque.addLast(event)
+                // Evict oldest events if buffer is full
+                while (deque.size > MAX_BUFFERED_EVENTS) {
+                    deque.pollFirst()
+                }
             }
 
             else -> {
@@ -215,6 +255,7 @@ class MinecraftBridge(private val config: ParrotConfig) {
     private fun onDisconnect() {
         _connected.set(false)
         session = null
+        eventBuffer.clear()
         val exception = RuntimeException("Disconnected from Minecraft")
         for ((id, deferred) in pendingRequests) {
             deferred.completeExceptionally(exception)

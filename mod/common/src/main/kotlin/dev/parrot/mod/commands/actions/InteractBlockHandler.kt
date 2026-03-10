@@ -7,6 +7,7 @@ import kotlinx.serialization.json.put
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.world.InteractionHand
+import net.minecraft.world.InteractionResult
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.Vec3
 
@@ -50,7 +51,12 @@ class InteractBlockHandler : CommandHandler {
 
         return buildJsonObject {
             put("success", true)
-            put("result", result.javaClass.simpleName.lowercase())
+            put("result", when (result) {
+                is InteractionResult.Success -> "consumed"
+                is InteractionResult.Pass -> "pass"
+                is InteractionResult.Fail -> "fail"
+                else -> "pass"
+            })
         }
     }
 }

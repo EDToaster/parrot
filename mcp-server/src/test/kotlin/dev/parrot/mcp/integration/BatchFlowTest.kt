@@ -36,8 +36,10 @@ class BatchFlowTest {
         withTimeout(10_000) {
             val blockResponse = buildJsonObject { put("id", "minecraft:stone") }
             val playerResponse = buildJsonObject { put("name", "Steve") }
+            val worldResponse = buildJsonObject { put("time", 6000) }
             mockServer.registerResponse("get_block", blockResponse)
             mockServer.registerResponse("get_player", playerResponse)
+            mockServer.registerResponse("get_world_info", worldResponse)
             mockServer.start()
 
             val config = ParrotConfig(host = "127.0.0.1", port = mockServer.actualPort, token = null)
@@ -49,19 +51,21 @@ class BatchFlowTest {
                 id = UUID.randomUUID().toString(),
                 commands = listOf(
                     BatchCommand(method = "get_block", params = buildJsonObject { put("x", 0) }),
-                    BatchCommand(method = "get_player")
+                    BatchCommand(method = "get_player"),
+                    BatchCommand(method = "get_world_info")
                 )
             )
             val result = bridge.sendRequest(request)
 
             val results = result["results"]?.jsonArray
-            assertEquals(2, results?.size)
+            assertEquals(3, results?.size)
             assertEquals("minecraft:stone", results?.get(0)?.jsonObject?.get("id")?.jsonPrimitive?.content)
             assertEquals("Steve", results?.get(1)?.jsonObject?.get("name")?.jsonPrimitive?.content)
+            assertEquals(6000, results?.get(2)?.jsonObject?.get("time")?.jsonPrimitive?.int)
 
             val batchMessages = mockServer.receivedMessages.filterIsInstance<BatchRequest>()
             assertEquals(1, batchMessages.size)
-            assertEquals(2, batchMessages[0].commands.size)
+            assertEquals(3, batchMessages[0].commands.size)
         }
     }
 }
