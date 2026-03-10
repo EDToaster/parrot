@@ -5,3 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.shadow) apply false
 }
+
+subprojects {
+    group = rootProject.property("mod_group") as String
+    version = rootProject.property("mod_version") as String
+}

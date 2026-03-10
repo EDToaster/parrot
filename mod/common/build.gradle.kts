@@ -37,6 +37,12 @@ artifacts {
     add("commonResources", sourceSets.main.get().resources.sourceDirectories.singleFile)
 }
 
+// Publish capability so loader modules can requireCapability("group:mod_id")
+val capabilityGroup = project.group.toString().ifEmpty { rootProject.property("mod_group") as String }
+listOf("apiElements", "runtimeElements").forEach { variant ->
+    configurations.findByName(variant)?.outgoing?.capability("$capabilityGroup:$mod_id:${project.version}")
+}
+
 // Loader attribute for MultiLoader resolution
 val loaderAttr = Attribute.of("io.github.mcgradleconventions.loader", String::class.java)
 listOf("apiElements", "runtimeElements", "sourcesElements").forEach { variant ->
