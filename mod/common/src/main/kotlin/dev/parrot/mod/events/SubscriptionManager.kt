@@ -14,6 +14,7 @@ class SubscriptionManager {
     private val subscriptions = ConcurrentHashMap<String, Subscription>()
     private val nextId = AtomicInteger(1)
     var eventSender: ((String, JsonObject) -> Unit)? = null
+    var consequenceSink: ((String, Long, JsonObject, Vec3?) -> Unit)? = null
 
     fun subscribe(eventTypes: Set<ParrotEventType>, spatialFilter: SpatialFilter?, channelId: String): String {
         val id = "sub-${nextId.getAndIncrement()}"
@@ -26,6 +27,7 @@ class SubscriptionManager {
     fun cleanupChannel(channelId: String) { subscriptions.entries.removeIf { it.value.channelId == channelId } }
 
     fun dispatch(eventType: ParrotEventType, tick: Long, data: JsonObject, position: Vec3? = null) {
+        consequenceSink?.invoke(eventType.id, tick, data, position)
         for ((_, sub) in subscriptions) {
             if (eventType !in sub.eventTypes) continue
             if (sub.spatialFilter != null && position != null) {

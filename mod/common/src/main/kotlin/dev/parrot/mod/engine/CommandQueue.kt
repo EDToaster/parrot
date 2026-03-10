@@ -14,9 +14,11 @@ import java.util.concurrent.ConcurrentLinkedQueue
 class CommandQueue(
     private val registry: CommandRegistry,
     private val platformBridge: PlatformBridge? = null,
-    private val maxPerTick: Int = 20
+    private val maxPerTick: Int = 20,
+    private val consequenceCollector: ConsequenceCollector? = null
 ) {
     private val queue = ConcurrentLinkedQueue<PendingCommand>()
+    private val deferred = mutableListOf<PendingCommand>()
 
     fun enqueue(message: ParrotMessage, channel: Channel): CompletableFuture<ParrotMessage> {
         val future = CompletableFuture<ParrotMessage>()
@@ -25,13 +27,33 @@ class CommandQueue(
     }
 
     fun drainAndExecute(server: MinecraftServer, tickCount: Long) {
+        // Phase 2: Complete deferred commands whose collection windows are done
+        val completed = deferred.filter { it.collectionHandle?.future?.isDone == true }
+        for (pending in completed) {
+            try {
+                val consequences = pending.collectionHandle!!.future.get()
+                val response = buildDeferredResponse(pending, consequences)
+                pending.future.complete(response)
+            } catch (e: Exception) {
+                pending.future.complete(ErrorResponse(
+                    id = pending.message.id,
+                    code = ErrorCode.INTERNAL_ERROR.code,
+                    message = "Error completing deferred response: ${e.message}"
+                ))
+            }
+        }
+        deferred.removeAll(completed.toSet())
+
+        // Phase 1: Drain new commands
         var executed = 0
         while (executed < maxPerTick) {
             val pending = queue.poll() ?: break
             try {
-                // Dispatch to command registry (implemented in Phase 3)
-                val response = dispatch(pending.message, server, tickCount)
-                pending.future.complete(response)
+                val response = dispatch(pending, server, tickCount)
+                if (response != null) {
+                    pending.future.complete(response)
+                }
+                // if null, command was deferred — future will be completed in phase 2 later
             } catch (e: Exception) {
                 pending.future.complete(ErrorResponse(
                     id = pending.message.id,
@@ -43,7 +65,8 @@ class CommandQueue(
         }
     }
 
-    private fun dispatch(message: ParrotMessage, server: MinecraftServer, tickCount: Long): ParrotMessage {
+    private fun dispatch(pending: PendingCommand, server: MinecraftServer, tickCount: Long): ParrotMessage? {
+        val message = pending.message
         val context = CommandContext(
             server = server,
             player = server.playerList.players.firstOrNull(),
@@ -68,7 +91,21 @@ class CommandQueue(
                     ?: return ErrorResponse(id = message.id, code = ErrorCode.UNKNOWN_METHOD.code, message = "Unknown method: ${message.method}")
                 try {
                     val result = handler.handle(message.params, context)
-                    ActionResult(id = message.id, success = true, tick = tickCount, result = result)
+                    if (message.consequenceWait > 0 && consequenceCollector != null) {
+                        val handle = consequenceCollector.startCollecting(
+                            startTick = tickCount,
+                            tickWindow = message.consequenceWait,
+                            filter = message.consequenceFilter
+                        )
+                        deferred.add(PendingCommand(
+                            message = message, channel = pending.channel, future = pending.future,
+                            collectionHandle = handle,
+                            deferredResult = DeferredResult.Action(result = result, tick = tickCount)
+                        ))
+                        null // response deferred
+                    } else {
+                        ActionResult(id = message.id, success = true, tick = tickCount, result = result)
+                    }
                 } catch (e: ParrotException) {
                     ErrorResponse(id = message.id, code = e.errorCode.code, message = e.message)
                 }
@@ -80,12 +117,30 @@ class CommandQueue(
                 try {
                     val params = buildJsonObject { put("command", message.command) }
                     val result = handler.handle(params, context)
-                    CommandResult(
-                        id = message.id,
-                        success = result["success"]?.toString() == "true",
-                        tick = tickCount,
-                        output = result["output"]?.toString() ?: ""
-                    )
+                    if (message.consequenceWait > 0 && consequenceCollector != null) {
+                        val handle = consequenceCollector.startCollecting(
+                            startTick = tickCount,
+                            tickWindow = message.consequenceWait,
+                            filter = null
+                        )
+                        deferred.add(PendingCommand(
+                            message = message, channel = pending.channel, future = pending.future,
+                            collectionHandle = handle,
+                            deferredResult = DeferredResult.Command(
+                                output = result["output"]?.jsonPrimitive?.content ?: "",
+                                returnValue = result["return_value"]?.jsonPrimitive?.intOrNull,
+                                tick = tickCount
+                            )
+                        ))
+                        null // response deferred
+                    } else {
+                        CommandResult(
+                            id = message.id,
+                            success = result["success"]?.toString() == "true",
+                            tick = tickCount,
+                            output = result["output"]?.toString() ?: ""
+                        )
+                    }
                 } catch (e: ParrotException) {
                     ErrorResponse(id = message.id, code = e.errorCode.code, message = e.message)
                 }
@@ -152,6 +207,19 @@ class CommandQueue(
                 id = message.id,
                 code = ErrorCode.INVALID_REQUEST.code,
                 message = "Unsupported message type: ${message::class.simpleName}"
+            )
+        }
+    }
+
+    private fun buildDeferredResponse(pending: PendingCommand, consequences: List<Consequence>): ParrotMessage {
+        return when (val dr = pending.deferredResult!!) {
+            is DeferredResult.Action -> ActionResult(
+                id = pending.message.id, success = true, tick = dr.tick,
+                result = dr.result, consequences = consequences
+            )
+            is DeferredResult.Command -> CommandResult(
+                id = pending.message.id, success = true, tick = dr.tick,
+                output = dr.output, returnValue = dr.returnValue, consequences = consequences
             )
         }
     }
