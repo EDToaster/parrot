@@ -2,3 +2,10 @@
 .mcp.json
 .claude/worktrees/
 CLAUDE.local.md
+
+# Gradle
+build/
+.gradle/
+buildSrc/build/
+buildSrc/.gradle/
+runs/

@@ -1,0 +1,41 @@
+[versions]
+minecraft = "1.21.10"
+neo_form = "1.21.10-20251010.172816"
+fabric_loader = "0.18.4"
+fabric_api = "0.138.4+1.21.10"
+fabric_language_kotlin = "1.13.9+kotlin.2.3.10"
+neoforge = "21.10.64"
+neoforge_moddev = "2.0.140"
+fabric_loom = "1.11-SNAPSHOT"
+kotlin = "2.3.10"
+mcp_sdk = "0.9.0"
+ktor = "3.4.1"
+kotlinx_serialization = "1.10.0"
+kotlinx_coroutines = "1.10.2"
+shadow = "9.3.2"
+parchment_minecraft = "1.21.9"
+parchment_version = "2025.10.05"
+mixin = "0.8.5"
+mixinextras = "0.3.5"
+java = "21"
+
+[libraries]
+minecraft = { module = "com.mojang:minecraft", version.ref = "minecraft" }
+fabric_loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric_loader" }
+fabric_api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric_api" }
+fabric_language_kotlin = { module = "net.fabricmc:fabric-language-kotlin", version.ref = "fabric_language_kotlin" }
+neoforge = { module = "net.neoforged:neoforge", version.ref = "neoforge" }
+mixin = { module = "org.spongepowered:mixin", version.ref = "mixin" }
+mixinextras_common = { module = "io.github.llamalad7:mixinextras-common", version.ref = "mixinextras" }
+mcp_kotlin_sdk = { module = "io.modelcontextprotocol:kotlin-sdk", version.ref = "mcp_sdk" }
+ktor_client_cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor_client_websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
+kotlinx_serialization_json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx_serialization" }
+kotlinx_coroutines_core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx_coroutines" }
+
+[plugins]
+kotlin_jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin_serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+fabric_loom = { id = "fabric-loom", version.ref = "fabric_loom" }
+neoforge_moddev = { id = "net.neoforged.moddev", version.ref = "neoforge_moddev" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
