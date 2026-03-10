@@ -23,8 +23,33 @@ loom {
     runs {
         named("client") { client(); configName = "Fabric Client"; ideConfigGenerated(true); runDir("runs/client") }
         named("server") { server(); configName = "Fabric Server"; ideConfigGenerated(true); runDir("runs/server") }
+        create("gametest") {
+            server()
+            name("Game Test")
+            vmArg("-Dfabric-api.gametest")
+            vmArg("-Dfabric-api.gametest.report-file=${project.layout.buildDirectory.get()}/gametest/report.xml")
+            runDir("runs/gametest")
+        }
     }
     splitEnvironmentSourceSets()
+}
+
+// Gametest source set
+sourceSets {
+    create("gametest") {
+        compileClasspath += sourceSets.main.get().compileClasspath
+        compileClasspath += sourceSets.main.get().output
+        runtimeClasspath += sourceSets.main.get().runtimeClasspath
+        runtimeClasspath += sourceSets.main.get().output
+    }
+}
+
+loom {
+    runs {
+        named("gametest") {
+            source(sourceSets.getByName("gametest"))
+        }
+    }
 }
 
 kotlin {
