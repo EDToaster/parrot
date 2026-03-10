@@ -29,19 +29,18 @@ object ToolRegistrar {
 
     private data class ConsequenceDefaults(
         val filter: List<String>?,  // null means all types
-        val wait: Int,
-        val spatial: Boolean
+        val wait: Int
     )
 
     private val DEFAULT_FILTERS = mapOf(
-        "interact_block" to ConsequenceDefaults(listOf("screen_opened", "block_changed", "inventory_changed"), 5, true),
-        "attack_block" to ConsequenceDefaults(listOf("block_changed"), 3, true),
-        "interact_entity" to ConsequenceDefaults(listOf("screen_opened", "inventory_changed"), 5, false),
-        "attack_entity" to ConsequenceDefaults(listOf("entity_removed"), 5, false),
-        "click_slot" to ConsequenceDefaults(listOf("inventory_changed"), 2, false),
-        "close_screen" to ConsequenceDefaults(listOf("screen_closed", "inventory_changed"), 2, false),
-        "set_held_slot" to ConsequenceDefaults(emptyList(), 0, false),
-        "send_chat" to ConsequenceDefaults(listOf("chat_message"), 3, false),
+        "interact_block" to ConsequenceDefaults(listOf("screen_opened", "block_changed", "inventory_changed"), 5),
+        "attack_block" to ConsequenceDefaults(listOf("block_changed"), 3),
+        "interact_entity" to ConsequenceDefaults(listOf("screen_opened", "inventory_changed"), 5),
+        "attack_entity" to ConsequenceDefaults(listOf("entity_removed"), 5),
+        "click_slot" to ConsequenceDefaults(listOf("inventory_changed"), 2),
+        "close_screen" to ConsequenceDefaults(listOf("screen_closed", "inventory_changed"), 2),
+        "set_held_slot" to ConsequenceDefaults(emptyList(), 0),
+        "send_chat" to ConsequenceDefaults(listOf("chat_message"), 3),
     )
 
     fun registerAll(server: Server, bridge: MinecraftBridge) {
