@@ -1,0 +1,438 @@
+package dev.parrot.mcp
+
+import dev.parrot.protocol.ActionRequest
+import dev.parrot.protocol.BatchCommand
+import dev.parrot.protocol.BatchRequest
+import dev.parrot.protocol.CommandRequest
+import dev.parrot.protocol.QueryRequest
+import dev.parrot.protocol.SubscribeRequest
+import dev.parrot.protocol.UnsubscribeRequest
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
+import java.util.UUID
+
+object ToolRegistrar {
+
+    fun registerAll(server: Server, bridge: MinecraftBridge) {
+        registerQueryTools(server, bridge)
+        registerActionTools(server, bridge)
+        registerOtherTools(server, bridge)
+    }
+
+    private fun registerQueryTools(server: Server, bridge: MinecraftBridge) {
+        // 1. get_block
+        server.addTool(
+            name = "get_block",
+            description = "Get the block state at a specific position",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("x") { put("type", "integer"); put("description", "X coordinate") }
+                    putJsonObject("y") { put("type", "integer"); put("description", "Y coordinate") }
+                    putJsonObject("z") { put("type", "integer"); put("description", "Z coordinate") }
+                },
+                required = listOf("x", "y", "z")
+            )
+        ) { request ->
+            handleQuery(bridge, "get_block", request.arguments)
+        }
+
+        // 2. get_blocks_area
+        server.addTool(
+            name = "get_blocks_area",
+            description = "Get all blocks in a rectangular area",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("x1") { put("type", "integer"); put("description", "First corner X coordinate") }
+                    putJsonObject("y1") { put("type", "integer"); put("description", "First corner Y coordinate") }
+                    putJsonObject("z1") { put("type", "integer"); put("description", "First corner Z coordinate") }
+                    putJsonObject("x2") { put("type", "integer"); put("description", "Second corner X coordinate") }
+                    putJsonObject("y2") { put("type", "integer"); put("description", "Second corner Y coordinate") }
+                    putJsonObject("z2") { put("type", "integer"); put("description", "Second corner Z coordinate") }
+                },
+                required = listOf("x1", "y1", "z1", "x2", "y2", "z2")
+            )
+        ) { request ->
+            handleQuery(bridge, "get_blocks_area", request.arguments)
+        }
+
+        // 3. get_world_info
+        server.addTool(
+            name = "get_world_info",
+            description = "Get world information including time, weather, and dimension"
+        ) { request ->
+            handleQuery(bridge, "get_world_info", request.arguments)
+        }
+
+        // 4. get_player
+        server.addTool(
+            name = "get_player",
+            description = "Get player information including position, health, food level, and game mode"
+        ) { request ->
+            handleQuery(bridge, "get_player", request.arguments)
+        }
+
+        // 5. get_inventory
+        server.addTool(
+            name = "get_inventory",
+            description = "Get the player's inventory contents"
+        ) { request ->
+            handleQuery(bridge, "get_inventory", request.arguments)
+        }
+
+        // 6. get_entities
+        server.addTool(
+            name = "get_entities",
+            description = "Get entities near a position",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("x") { put("type", "number"); put("description", "Center X coordinate") }
+                    putJsonObject("y") { put("type", "number"); put("description", "Center Y coordinate") }
+                    putJsonObject("z") { put("type", "number"); put("description", "Center Z coordinate") }
+                    putJsonObject("radius") { put("type", "number"); put("description", "Search radius") }
+                },
+                required = listOf("x", "y", "z", "radius")
+            )
+        ) { request ->
+            handleQuery(bridge, "get_entities", request.arguments)
+        }
+
+        // 7. get_entity
+        server.addTool(
+            name = "get_entity",
+            description = "Get detailed information about a specific entity",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("uuid") { put("type", "string"); put("description", "Entity UUID") }
+                },
+                required = listOf("uuid")
+            )
+        ) { request ->
+            handleQuery(bridge, "get_entity", request.arguments)
+        }
+
+        // 8. get_screen
+        server.addTool(
+            name = "get_screen",
+            description = "Get the currently open GUI screen"
+        ) { request ->
+            handleQuery(bridge, "get_screen", request.arguments)
+        }
+    }
+
+    private fun registerActionTools(server: Server, bridge: MinecraftBridge) {
+        // 9. do_interact_block
+        server.addTool(
+            name = "do_interact_block",
+            description = "Right-click/interact with a block",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("x") { put("type", "integer"); put("description", "Block X coordinate") }
+                    putJsonObject("y") { put("type", "integer"); put("description", "Block Y coordinate") }
+                    putJsonObject("z") { put("type", "integer"); put("description", "Block Z coordinate") }
+                    putJsonObject("face") { put("type", "string"); put("description", "Block face to interact with (default: up)") }
+                    putJsonObject("hand") { put("type", "string"); put("description", "Hand to use (default: main_hand)") }
+                },
+                required = listOf("x", "y", "z")
+            )
+        ) { request ->
+            handleAction(bridge, "interact_block", request.arguments)
+        }
+
+        // 10. do_attack_block
+        server.addTool(
+            name = "do_attack_block",
+            description = "Left-click/attack a block (start breaking)",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("x") { put("type", "integer"); put("description", "Block X coordinate") }
+                    putJsonObject("y") { put("type", "integer"); put("description", "Block Y coordinate") }
+                    putJsonObject("z") { put("type", "integer"); put("description", "Block Z coordinate") }
+                    putJsonObject("face") { put("type", "string"); put("description", "Block face to attack") }
+                },
+                required = listOf("x", "y", "z")
+            )
+        ) { request ->
+            handleAction(bridge, "attack_block", request.arguments)
+        }
+
+        // 11. do_interact_entity
+        server.addTool(
+            name = "do_interact_entity",
+            description = "Right-click/interact with an entity",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("uuid") { put("type", "string"); put("description", "Entity UUID") }
+                    putJsonObject("hand") { put("type", "string"); put("description", "Hand to use") }
+                },
+                required = listOf("uuid")
+            )
+        ) { request ->
+            handleAction(bridge, "interact_entity", request.arguments)
+        }
+
+        // 12. do_attack_entity
+        server.addTool(
+            name = "do_attack_entity",
+            description = "Left-click/attack an entity",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("uuid") { put("type", "string"); put("description", "Entity UUID") }
+                },
+                required = listOf("uuid")
+            )
+        ) { request ->
+            handleAction(bridge, "attack_entity", request.arguments)
+        }
+
+        // 13. do_click_slot
+        server.addTool(
+            name = "do_click_slot",
+            description = "Click a slot in the current screen",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("slot") { put("type", "integer"); put("description", "Slot index to click") }
+                    putJsonObject("button") { put("type", "integer"); put("description", "Mouse button (default: 0)") }
+                    putJsonObject("clickType") { put("type", "string"); put("description", "Click type (default: PICKUP)") }
+                },
+                required = listOf("slot")
+            )
+        ) { request ->
+            handleAction(bridge, "click_slot", request.arguments)
+        }
+
+        // 14. do_close_screen
+        server.addTool(
+            name = "do_close_screen",
+            description = "Close the currently open screen"
+        ) { request ->
+            handleAction(bridge, "close_screen", request.arguments)
+        }
+
+        // 15. do_set_held_slot
+        server.addTool(
+            name = "do_set_held_slot",
+            description = "Set the player's held item slot",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("slot") { put("type", "integer"); put("description", "Hotbar slot index (0-8)") }
+                },
+                required = listOf("slot")
+            )
+        ) { request ->
+            handleAction(bridge, "set_held_slot", request.arguments)
+        }
+
+        // 16. do_send_chat
+        server.addTool(
+            name = "do_send_chat",
+            description = "Send a chat message",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("message") { put("type", "string"); put("description", "Chat message to send") }
+                },
+                required = listOf("message")
+            )
+        ) { request ->
+            handleAction(bridge, "send_chat", request.arguments)
+        }
+    }
+
+    private fun registerOtherTools(server: Server, bridge: MinecraftBridge) {
+        // 17. run_command
+        server.addTool(
+            name = "run_command",
+            description = "Execute a server command",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("command") { put("type", "string"); put("description", "Server command to execute") }
+                },
+                required = listOf("command")
+            )
+        ) { request ->
+            if (!bridge.isConnected) return@addTool notConnectedResult()
+            try {
+                val args = request.arguments ?: JsonObject(emptyMap())
+                val command = args["command"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(content = listOf(TextContent("Error: missing 'command' parameter")), isError = true)
+                val result = bridge.sendRequest(
+                    CommandRequest(
+                        id = UUID.randomUUID().toString(),
+                        command = command
+                    )
+                )
+                CallToolResult(content = listOf(TextContent(result.toString())))
+            } catch (e: Exception) {
+                CallToolResult(content = listOf(TextContent("Error: ${e.message}")), isError = true)
+            }
+        }
+
+        // 18. batch
+        server.addTool(
+            name = "batch",
+            description = "Execute multiple commands in sequence",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("commands") {
+                        put("type", "array")
+                        putJsonObject("items") {
+                            put("type", "object")
+                            putJsonObject("properties") {
+                                putJsonObject("method") { put("type", "string") }
+                                putJsonObject("params") { put("type", "object") }
+                            }
+                            put("required", JsonArray(listOf(
+                                JsonPrimitive("method")
+                            )))
+                        }
+                        put("description", "Array of commands to execute")
+                    }
+                },
+                required = listOf("commands")
+            )
+        ) { request ->
+            if (!bridge.isConnected) return@addTool notConnectedResult()
+            try {
+                val args = request.arguments ?: JsonObject(emptyMap())
+                val commandsArray = args["commands"]?.jsonArray
+                    ?: return@addTool CallToolResult(content = listOf(TextContent("Error: missing 'commands' parameter")), isError = true)
+                val batchCommands = commandsArray.map { element ->
+                    val obj = element.jsonObject
+                    BatchCommand(
+                        method = obj["method"]!!.jsonPrimitive.content,
+                        params = obj["params"]?.jsonObject ?: JsonObject(emptyMap())
+                    )
+                }
+                val result = bridge.sendRequest(
+                    BatchRequest(
+                        id = UUID.randomUUID().toString(),
+                        commands = batchCommands
+                    )
+                )
+                CallToolResult(content = listOf(TextContent(result.toString())))
+            } catch (e: Exception) {
+                CallToolResult(content = listOf(TextContent("Error: ${e.message}")), isError = true)
+            }
+        }
+
+        // 19. subscribe
+        server.addTool(
+            name = "subscribe",
+            description = "Subscribe to game events",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("eventTypes") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("description", "List of event types to subscribe to")
+                    }
+                    putJsonObject("filter") { put("type", "object"); put("description", "Optional event filter") }
+                },
+                required = listOf("eventTypes")
+            )
+        ) { request ->
+            if (!bridge.isConnected) return@addTool notConnectedResult()
+            try {
+                val args = request.arguments ?: JsonObject(emptyMap())
+                val eventTypes = args["eventTypes"]?.jsonArray?.map { it.jsonPrimitive.content }
+                    ?: return@addTool CallToolResult(content = listOf(TextContent("Error: missing 'eventTypes' parameter")), isError = true)
+                val filter = args["filter"]?.jsonObject
+                val result = bridge.sendRequest(
+                    SubscribeRequest(
+                        id = UUID.randomUUID().toString(),
+                        eventTypes = eventTypes,
+                        filter = filter
+                    )
+                )
+                CallToolResult(content = listOf(TextContent(result.toString())))
+            } catch (e: Exception) {
+                CallToolResult(content = listOf(TextContent("Error: ${e.message}")), isError = true)
+            }
+        }
+
+        // 20. unsubscribe
+        server.addTool(
+            name = "unsubscribe",
+            description = "Unsubscribe from game events",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("subscriptionId") { put("type", "string"); put("description", "Subscription ID to cancel") }
+                },
+                required = listOf("subscriptionId")
+            )
+        ) { request ->
+            if (!bridge.isConnected) return@addTool notConnectedResult()
+            try {
+                val args = request.arguments ?: JsonObject(emptyMap())
+                val subscriptionId = args["subscriptionId"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(content = listOf(TextContent("Error: missing 'subscriptionId' parameter")), isError = true)
+                val result = bridge.sendRequest(
+                    UnsubscribeRequest(
+                        id = UUID.randomUUID().toString(),
+                        subscriptionId = subscriptionId
+                    )
+                )
+                CallToolResult(content = listOf(TextContent(result.toString())))
+            } catch (e: Exception) {
+                CallToolResult(content = listOf(TextContent("Error: ${e.message}")), isError = true)
+            }
+        }
+
+        // 21. list_methods
+        server.addTool(
+            name = "list_methods",
+            description = "List all available query and action methods"
+        ) { request ->
+            handleQuery(bridge, "list_methods", request.arguments)
+        }
+    }
+
+    private suspend fun handleQuery(bridge: MinecraftBridge, method: String, arguments: JsonObject?): CallToolResult {
+        if (!bridge.isConnected) return notConnectedResult()
+        return try {
+            val args = arguments ?: JsonObject(emptyMap())
+            val result = bridge.sendRequest(
+                QueryRequest(
+                    id = UUID.randomUUID().toString(),
+                    method = method,
+                    params = args
+                )
+            )
+            CallToolResult(content = listOf(TextContent(result.toString())))
+        } catch (e: Exception) {
+            CallToolResult(content = listOf(TextContent("Error: ${e.message}")), isError = true)
+        }
+    }
+
+    private suspend fun handleAction(bridge: MinecraftBridge, method: String, arguments: JsonObject?): CallToolResult {
+        if (!bridge.isConnected) return notConnectedResult()
+        return try {
+            val args = arguments ?: JsonObject(emptyMap())
+            val result = bridge.sendRequest(
+                ActionRequest(
+                    id = UUID.randomUUID().toString(),
+                    method = method,
+                    params = args
+                )
+            )
+            CallToolResult(content = listOf(TextContent(result.toString())))
+        } catch (e: Exception) {
+            CallToolResult(content = listOf(TextContent("Error: ${e.message}")), isError = true)
+        }
+    }
+
+    private fun notConnectedResult() = CallToolResult(
+        content = listOf(TextContent("Not connected to Minecraft. Start a game with the Parrot mod installed.")),
+        isError = true
+    )
+}
