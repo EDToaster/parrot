@@ -1,6 +1,6 @@
 # Minecraft MCP Server - Exploration Reports
 
-Feasibility exploration conducted 2026-03-10 by 8 parallel explorer agents + 1 evaluator.
+Feasibility exploration and design refinement conducted 2026-03-10 by 13 parallel explorer agents + 1 evaluator.
 
 ## Reports
 
@@ -18,6 +18,13 @@ Feasibility exploration conducted 2026-03-10 by 8 parallel explorer agents + 1 e
 
 ### Synthesis
 9. [Evaluation Report](09-evaluation-report.md) — Comparative evaluation and final architecture recommendation
+
+### Refinement (Detailed Design)
+10. [Kotlin MCP Server Design](10-mcp-server-design.md) — SDK, stdio transport, WebSocket client, tool registration, connection discovery
+11. [Client/Server Side Split](11-client-server-design.md) — GUI (client) vs world state (server), singleplayer vs dedicated, packet relay
+12. [Protocol Design](12-protocol-design.md) — Playwright-style action-consequence protocol, tick-based windows, JSON examples
+13. [Tool Vocabulary](13-tool-vocabulary.md) — 21 MCP tools across 9 categories, 6 resources, debugging workflow examples
+14. [Build & Distribution](14-build-distribution-design.md) — Gradle multi-module, Shadow JAR, installation, CI/CD
 
 ## Key Conclusions
 
