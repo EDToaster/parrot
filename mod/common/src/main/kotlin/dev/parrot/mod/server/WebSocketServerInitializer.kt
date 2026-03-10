@@ -17,7 +17,7 @@ class WebSocketServerInitializer(
         ch.pipeline().addLast(
             HttpServerCodec(),
             HttpObjectAggregator(65536),
-            WebSocketServerProtocolHandler("/"),
+            WebSocketServerProtocolHandler("/parrot"),
             ParrotMessageHandler(server, commandQueue, subscriptionManager)
         )
     }

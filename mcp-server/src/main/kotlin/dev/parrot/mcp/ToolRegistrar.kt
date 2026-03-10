@@ -202,11 +202,11 @@ object ToolRegistrar {
             description = "Click a slot in the current screen",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
-                    putJsonObject("slot") { put("type", "integer"); put("description", "Slot index to click") }
+                    putJsonObject("slot_index") { put("type", "integer"); put("description", "Slot index to click") }
                     putJsonObject("button") { put("type", "integer"); put("description", "Mouse button (default: 0)") }
-                    putJsonObject("clickType") { put("type", "string"); put("description", "Click type (default: PICKUP)") }
+                    putJsonObject("shift") { put("type", "boolean"); put("description", "Use shift-click / QUICK_MOVE (default: false)") }
                 },
-                required = listOf("slot")
+                required = listOf("slot_index", "button")
             )
         ) { request ->
             handleAction(bridge, "click_slot", request.arguments)
