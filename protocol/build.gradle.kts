@@ -1,4 +1,5 @@
 plugins {
+    `java-library`
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -6,12 +7,16 @@ plugins {
 group = "dev.parrot"
 version = rootProject.property("mod_version") as String
 
+repositories {
+    mavenCentral()
+}
+
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
 
 dependencies {
-    implementation(libs.kotlinx.serialization.json)
+    api(libs.kotlinx.serialization.json)
 }
 
 kotlin {
