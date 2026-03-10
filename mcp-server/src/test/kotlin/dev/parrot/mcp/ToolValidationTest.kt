@@ -128,13 +128,13 @@ class ToolValidationTest {
     // --- Tool schema validation tests ---
 
     @Test
-    fun `all 21 expected tools are registered`() {
+    fun `all 22 expected tools are registered`() {
         val expectedTools = listOf(
             "get_block", "get_blocks_area", "get_world_info", "get_player",
             "get_inventory", "get_entities", "get_entity", "get_screen",
             "do_interact_block", "do_attack_block", "do_interact_entity", "do_attack_entity",
             "do_click_slot", "do_close_screen", "do_set_held_slot", "do_send_chat",
-            "run_command", "batch", "subscribe", "unsubscribe", "list_methods"
+            "run_command", "batch", "subscribe", "unsubscribe", "poll_events", "list_methods"
         )
 
         for (toolName in expectedTools) {
@@ -203,7 +203,7 @@ class ToolValidationTest {
                 ?: error("Tool '$toolName' not registered")
             val schema = tool.tool.inputSchema
             // These tools either have no schema or no required fields
-            val required = schema?.required ?: emptyList()
+            val required = schema.required ?: emptyList()
             assertTrue(
                 required.isEmpty(),
                 "Tool '$toolName' should have no required parameters, but has: $required"

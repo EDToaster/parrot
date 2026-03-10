@@ -37,11 +37,14 @@ loom {
 // Gametest source set
 sourceSets {
     create("gametest") {
-        compileClasspath += sourceSets.main.get().compileClasspath
         compileClasspath += sourceSets.main.get().output
-        runtimeClasspath += sourceSets.main.get().runtimeClasspath
         runtimeClasspath += sourceSets.main.get().output
     }
+}
+
+configurations {
+    named("gametestCompileClasspath") { extendsFrom(configurations.getByName("compileClasspath")) }
+    named("gametestRuntimeClasspath") { extendsFrom(configurations.getByName("runtimeClasspath")) }
 }
 
 loom {

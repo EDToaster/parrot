@@ -2,18 +2,17 @@ package dev.parrot.mod.test
 
 import dev.parrot.protocol.*
 import kotlinx.serialization.json.*
-import net.fabricmc.fabric.api.gametest.v1.FabricGameTest
+import net.fabricmc.fabric.api.gametest.v1.GameTest
 import net.minecraft.core.BlockPos
-import net.minecraft.gametest.framework.GameTest
 import net.minecraft.gametest.framework.GameTestHelper
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.level.block.Blocks
 import java.nio.file.Files
 import java.nio.file.Path
 
-class ParrotGameTests : FabricGameTest {
+class ParrotGameTests {
 
-    @GameTest(template = FabricGameTest.EMPTY_STRUCTURE)
+    @GameTest
     fun webSocketLifecycleTest(helper: GameTestHelper) {
         // Verify the WebSocket server is running by attempting a connection
         val client = ParrotTestHelper.connectAndAuth()
@@ -21,7 +20,7 @@ class ParrotGameTests : FabricGameTest {
         helper.succeed()
     }
 
-    @GameTest(template = FabricGameTest.EMPTY_STRUCTURE)
+    @GameTest
     fun connectionFileTest(helper: GameTestHelper) {
         val connectionFile = Path.of(System.getProperty("user.home"), ".parrot", "connection.json")
         if (!Files.exists(connectionFile)) {
@@ -41,7 +40,7 @@ class ParrotGameTests : FabricGameTest {
         helper.succeed()
     }
 
-    @GameTest(template = FabricGameTest.EMPTY_STRUCTURE)
+    @GameTest
     fun getBlockTest(helper: GameTestHelper) {
         // Place a diamond block at a known position within the test structure
         val relPos = BlockPos(1, 1, 1)
@@ -78,7 +77,7 @@ class ParrotGameTests : FabricGameTest {
         }
     }
 
-    @GameTest(template = FabricGameTest.EMPTY_STRUCTURE)
+    @GameTest
     fun getEntitiesTest(helper: GameTestHelper) {
         // Spawn a cow at a known position
         val relPos = BlockPos(2, 1, 2)
@@ -119,7 +118,7 @@ class ParrotGameTests : FabricGameTest {
         }
     }
 
-    @GameTest(template = FabricGameTest.EMPTY_STRUCTURE)
+    @GameTest
     fun interactBlockTest(helper: GameTestHelper) {
         // Place a chest at a known position
         val relPos = BlockPos(1, 1, 1)
@@ -160,7 +159,7 @@ class ParrotGameTests : FabricGameTest {
         }
     }
 
-    @GameTest(template = FabricGameTest.EMPTY_STRUCTURE)
+    @GameTest
     fun runCommandTest(helper: GameTestHelper) {
         val client = ParrotTestHelper.connectAndAuth()
         try {
@@ -184,7 +183,7 @@ class ParrotGameTests : FabricGameTest {
         }
     }
 
-    @GameTest(template = FabricGameTest.EMPTY_STRUCTURE, timeoutTicks = 200)
+    @GameTest(maxTicks = 200)
     fun eventSubscriptionTest(helper: GameTestHelper) {
         val client = ParrotTestHelper.connectAndAuth()
         try {
