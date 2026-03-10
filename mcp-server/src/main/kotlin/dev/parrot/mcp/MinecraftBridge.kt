@@ -117,7 +117,21 @@ class MinecraftBridge(private val config: ParrotConfig) {
             }
 
             is ActionResult -> {
-                pendingRequests.remove(message.id)?.complete(message.result)
+                val result = buildJsonObject {
+                    put("success", message.success)
+                    put("tick", message.tick)
+                    put("result", message.result)
+                    putJsonArray("consequences") {
+                        for (c in message.consequences) {
+                            addJsonObject {
+                                put("type", c.type)
+                                put("tick", c.tick)
+                                put("data", c.data)
+                            }
+                        }
+                    }
+                }
+                pendingRequests.remove(message.id)?.complete(result)
             }
 
             is CommandResult -> {
