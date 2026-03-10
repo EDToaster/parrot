@@ -10,7 +10,8 @@
     "environment": "*",
     "entrypoints": {
         "main": [{ "adapter": "kotlin", "value": "dev.parrot.mod.fabric.ParrotFabric" }],
-        "client": [{ "adapter": "kotlin", "value": "dev.parrot.mod.fabric.client.ParrotFabricClient" }]
+        "client": [{ "adapter": "kotlin", "value": "dev.parrot.mod.fabric.client.ParrotFabricClient" }],
+        "fabric-gametest": ["dev.parrot.mod.test.ParrotGameTests"]
     },
     "depends": {
         "fabricloader": ">=${fabric_loader_version}",
