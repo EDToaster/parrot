@@ -24,7 +24,7 @@ class RunCommandHandler : CommandHandler {
             .withPermission(4) // op level
 
         val returnValue = try {
-            context.server.commands.performPrefixedCommand(source, command)
+            context.server.commands.dispatcher.execute(command, source)
         } catch (e: Exception) {
             return buildJsonObject {
                 put("success", false); put("return_value", 0)
