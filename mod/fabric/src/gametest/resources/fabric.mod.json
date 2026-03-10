@@ -1,0 +1,13 @@
+{
+    "schemaVersion": 1,
+    "id": "parrot-gametest",
+    "version": "${version}",
+    "name": "Parrot Game Tests",
+    "environment": "*",
+    "entrypoints": {
+        "fabric-gametest": ["dev.parrot.mod.test.ParrotGameTests"]
+    },
+    "depends": {
+        "parrot": "*"
+    }
+}
