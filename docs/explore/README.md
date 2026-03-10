@@ -26,6 +26,9 @@ Feasibility exploration and design refinement conducted 2026-03-10 by 13 paralle
 13. [Tool Vocabulary](13-tool-vocabulary.md) — 21 MCP tools across 9 categories, 6 resources, debugging workflow examples
 14. [Build & Distribution](14-build-distribution-design.md) — Gradle multi-module, Shadow JAR, installation, CI/CD
 
+### Design Decisions
+15. [Context Optimization](15-context-optimization-decision.md) — Batch commands & smart tools (MVP-critical), scripting (fast-follow)
+
 ## Key Conclusions
 
 - **Verdict:** Build it. Both Fabric and NeoForge fully support all required capabilities.
