@@ -37,11 +37,11 @@ dependencies {
     testImplementation("io.ktor:ktor-server-websockets:3.4.1")
 }
 
+tasks.test { useJUnitPlatform() }
+
 kotlin {
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21) }
 }
-
-tasks.test { useJUnitPlatform() }
 
 tasks.shadowJar {
     archiveBaseName.set("parrot-mcp-server")
