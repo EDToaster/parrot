@@ -81,7 +81,7 @@ Ask Claude things like:
 - *"What block am I standing on?"*
 - *"Build a 5x5 stone platform at my feet"*
 - *"What entities are near me?"*
-- *"Open the chest at 100, 64, -200 and tell me what's inside"*
+- *"Open the chest at 100, 64, -200 and tell me what's inside"* — consequence feedback tells Claude the screen opened
 - *"Set the time to noon"*
 
 ---
@@ -103,23 +103,27 @@ Ask Claude things like:
 
 ### Actions
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| `do_interact_block` | Right-click a block | `x,y,z`, `face`, `hand` |
-| `do_attack_block` | Break a block (creative) | `x,y,z`, `face` |
-| `do_interact_entity` | Right-click an entity | `uuid`, `hand` |
-| `do_attack_entity` | Attack an entity | `uuid` |
-| `do_click_slot` | Click an inventory slot | `slot`, `button`, `clickType` |
-| `do_close_screen` | Close the open GUI | — |
-| `do_set_held_slot` | Switch hotbar slot | `slot` (0-8) |
-| `do_send_chat` | Send a chat message | `message` |
+Actions return a `consequences` array — observed side effects (block changes, screen opens, inventory changes, etc.) collected during a short tick window after the action executes. Each tool has sensible default filters and wait times.
+
+| Tool | Description | Key Parameters | Default Consequences |
+|------|-------------|----------------|---------------------|
+| `do_interact_block` | Right-click a block | `x,y,z`, `face`, `hand` | `screen_opened`, `block_changed`, `inventory_changed` (5 ticks) |
+| `do_attack_block` | Break a block (creative) | `x,y,z`, `face` | `block_changed` (3 ticks) |
+| `do_interact_entity` | Right-click an entity | `uuid`, `hand` | `screen_opened`, `inventory_changed` (5 ticks) |
+| `do_attack_entity` | Attack an entity | `uuid` | `entity_removed` (5 ticks) |
+| `do_click_slot` | Click an inventory slot | `slot`, `button`, `clickType` | `inventory_changed` (2 ticks) |
+| `do_close_screen` | Close the open GUI | — | `screen_closed`, `inventory_changed` (2 ticks) |
+| `do_set_held_slot` | Switch hotbar slot | `slot` (0-8) | *(none)* |
+| `do_send_chat` | Send a chat message | `message` | `chat_message` (3 ticks) |
+
+All action tools accept optional `consequence_filter` (string array) and `consequence_wait` (integer, ticks) parameters to override defaults. Set `consequence_wait` to `0` to skip consequence collection entirely.
 
 ### Utility
 
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
-| `run_command` | Execute a server command (op-level) | `command` |
-| `batch` | Multiple read-only queries in one call | `commands[]` |
+| `run_command` | Execute a server command (op-level) | `command` (consequences: all types, 3 ticks) |
+| `batch` | Multiple read-only queries in one call (actions not supported) | `commands[]` |
 | `subscribe` | Subscribe to game events | `eventTypes[]` |
 | `unsubscribe` | Cancel a subscription | `subscriptionId` |
 | `poll_events` | Drain buffered events | `subscriptionId` (optional) |
@@ -144,6 +148,32 @@ Subscribe to real-time game events with the `subscribe` tool:
 `screen_opened`, `screen_closed`, `block_changed`, `entity_spawned`, `entity_removed`, `chat_message`, `inventory_changed`, `player_health_changed`, `player_moved`, `dimension_changed`, `death`, `respawn`, `advancement`, `block_break_progress`
 
 Events support spatial filtering — subscribe only to events within a radius of a position.
+
+---
+
+## Consequences
+
+When an action tool executes (e.g., right-clicking a chest), the game may produce side effects over the next few ticks — a screen opens, blocks change, inventory updates. Parrot captures these as **consequences** and returns them in the action result, so Claude knows what happened without needing a separate query.
+
+```
+Claude: do_interact_block(x=100, y=64, z=-200)   # right-click a chest
+Parrot: { result: {...}, consequences: [
+           { type: "screen_opened", tick: 101, data: { screenType: "chest", ... } },
+           { type: "inventory_changed", tick: 101, data: { ... } }
+         ]}
+```
+
+Each action tool has default filters (which event types to collect) and a default wait window (how many ticks to observe). Block-targeted actions also apply spatial filtering (8-block radius) to ignore unrelated world changes.
+
+Override defaults per-call with `consequence_filter` and `consequence_wait`:
+
+```json
+{ "name": "do_interact_block", "arguments": {
+    "x": 100, "y": 64, "z": -200,
+    "consequence_filter": ["screen_opened"],
+    "consequence_wait": 10
+}}
+```
 
 ---
 
@@ -177,7 +207,7 @@ parrot/
 - **Auth**: Each session requires a token (generated at startup, written to `~/.parrot/connection.json`).
 - **Creative mode only**: The MVP assumes Creative mode. No survival mechanics are handled.
 - **Loaded chunks only**: Queries return `BLOCK_OUT_OF_RANGE` for unloaded chunks — no force-loading.
-- **Consequences**: Action results include a `consequences` array — observed side effects (block changes, screen opens, etc.) within a short tick window after the action.
+- **Consequences**: Action results include a `consequences` array — observed side effects (block changes, screen opens, etc.) collected via a deferred response pattern. The action executes immediately, then the response is held for a configurable tick window while `ConsequenceCollector` captures matching game events. Each tool has smart defaults; Claude can override filters and wait time per-call.
 
 ---
 
