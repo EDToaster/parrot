@@ -31,6 +31,21 @@ class MinecraftBridge(private val config: ParrotConfig) {
                     session = this
                     delay = 1000L
 
+                    // Start receive loop first so handshake response can be processed
+                    val receiveJob = launch {
+                        try {
+                            for (frame in incoming) {
+                                if (frame is Frame.Text) {
+                                    handleFrame(frame.readText())
+                                }
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            System.err.println("[parrot-mcp] Receive error: ${e.message}")
+                        }
+                    }
+
                     // Hello handshake
                     val helloId = UUID.randomUUID().toString()
                     val helloDeferred = CompletableDeferred<JsonObject>()
@@ -41,18 +56,8 @@ class MinecraftBridge(private val config: ParrotConfig) {
                     _connected.set(true)
                     System.err.println("[parrot-mcp] Connected and authenticated")
 
-                    // Receive loop
-                    try {
-                        for (frame in incoming) {
-                            if (frame is Frame.Text) {
-                                handleFrame(frame.readText())
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        System.err.println("[parrot-mcp] Receive error: ${e.message}")
-                    }
+                    // Wait for receive loop to finish (connection closed)
+                    receiveJob.join()
                 }
             } catch (e: CancellationException) {
                 throw e

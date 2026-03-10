@@ -27,11 +27,21 @@ dependencies {
     implementation(libs.ktor.client.websockets)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)
+
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
+    testImplementation("io.mockk:mockk:1.13.13")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("io.ktor:ktor-server-core:3.4.1")
+    testImplementation("io.ktor:ktor-server-cio:3.4.1")
+    testImplementation("io.ktor:ktor-server-websockets:3.4.1")
 }
 
 kotlin {
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21) }
 }
+
+tasks.test { useJUnitPlatform() }
 
 tasks.shadowJar {
     archiveBaseName.set("parrot-mcp-server")
