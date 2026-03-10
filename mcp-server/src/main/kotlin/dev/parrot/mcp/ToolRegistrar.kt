@@ -15,6 +15,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -24,6 +26,22 @@ import kotlinx.serialization.json.putJsonObject
 import java.util.UUID
 
 object ToolRegistrar {
+
+    private data class ConsequenceDefaults(
+        val filter: List<String>?,  // null means all types
+        val wait: Int
+    )
+
+    private val DEFAULT_FILTERS = mapOf(
+        "interact_block" to ConsequenceDefaults(listOf("screen_opened", "block_changed", "inventory_changed"), 5),
+        "attack_block" to ConsequenceDefaults(listOf("block_changed"), 3),
+        "interact_entity" to ConsequenceDefaults(listOf("screen_opened", "inventory_changed"), 5),
+        "attack_entity" to ConsequenceDefaults(listOf("entity_removed"), 5),
+        "click_slot" to ConsequenceDefaults(listOf("inventory_changed"), 2),
+        "close_screen" to ConsequenceDefaults(listOf("screen_closed", "inventory_changed"), 2),
+        "set_held_slot" to ConsequenceDefaults(emptyList(), 0),
+        "send_chat" to ConsequenceDefaults(listOf("chat_message"), 3),
+    )
 
     fun registerAll(server: Server, bridge: MinecraftBridge) {
         registerQueryTools(server, bridge)
@@ -135,7 +153,7 @@ object ToolRegistrar {
         // 9. do_interact_block
         server.addTool(
             name = "do_interact_block",
-            description = "Right-click/interact with a block",
+            description = "Right-click/interact with a block. Waits 5 ticks for screen_opened, block_changed, inventory_changed within 8 blocks. Override with consequence_filter/consequence_wait.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     putJsonObject("x") { put("type", "integer"); put("description", "Block X coordinate") }
@@ -143,6 +161,15 @@ object ToolRegistrar {
                     putJsonObject("z") { put("type", "integer"); put("description", "Block Z coordinate") }
                     putJsonObject("face") { put("type", "string"); put("description", "Block face to interact with (default: up)") }
                     putJsonObject("hand") { put("type", "string"); put("description", "Hand to use (default: main_hand)") }
+                    putJsonObject("consequence_filter") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("description", "Override event types to collect. Replaces defaults.")
+                    }
+                    putJsonObject("consequence_wait") {
+                        put("type", "integer")
+                        put("description", "Override ticks to wait for consequences. 0 disables collection.")
+                    }
                 },
                 required = listOf("x", "y", "z")
             )
@@ -153,13 +180,22 @@ object ToolRegistrar {
         // 10. do_attack_block
         server.addTool(
             name = "do_attack_block",
-            description = "Left-click/attack a block (start breaking)",
+            description = "Left-click/attack a block (start breaking). Waits 3 ticks for block_changed within 8 blocks. Override with consequence_filter/consequence_wait.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     putJsonObject("x") { put("type", "integer"); put("description", "Block X coordinate") }
                     putJsonObject("y") { put("type", "integer"); put("description", "Block Y coordinate") }
                     putJsonObject("z") { put("type", "integer"); put("description", "Block Z coordinate") }
                     putJsonObject("face") { put("type", "string"); put("description", "Block face to attack") }
+                    putJsonObject("consequence_filter") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("description", "Override event types to collect. Replaces defaults.")
+                    }
+                    putJsonObject("consequence_wait") {
+                        put("type", "integer")
+                        put("description", "Override ticks to wait for consequences. 0 disables collection.")
+                    }
                 },
                 required = listOf("x", "y", "z")
             )
@@ -170,11 +206,20 @@ object ToolRegistrar {
         // 11. do_interact_entity
         server.addTool(
             name = "do_interact_entity",
-            description = "Right-click/interact with an entity",
+            description = "Right-click/interact with an entity. Waits 5 ticks for screen_opened, inventory_changed. Override with consequence_filter/consequence_wait.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     putJsonObject("uuid") { put("type", "string"); put("description", "Entity UUID") }
                     putJsonObject("hand") { put("type", "string"); put("description", "Hand to use") }
+                    putJsonObject("consequence_filter") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("description", "Override event types to collect. Replaces defaults.")
+                    }
+                    putJsonObject("consequence_wait") {
+                        put("type", "integer")
+                        put("description", "Override ticks to wait for consequences. 0 disables collection.")
+                    }
                 },
                 required = listOf("uuid")
             )
@@ -185,10 +230,19 @@ object ToolRegistrar {
         // 12. do_attack_entity
         server.addTool(
             name = "do_attack_entity",
-            description = "Left-click/attack an entity",
+            description = "Left-click/attack an entity. Waits 5 ticks for entity_removed. Override with consequence_filter/consequence_wait.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     putJsonObject("uuid") { put("type", "string"); put("description", "Entity UUID") }
+                    putJsonObject("consequence_filter") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("description", "Override event types to collect. Replaces defaults.")
+                    }
+                    putJsonObject("consequence_wait") {
+                        put("type", "integer")
+                        put("description", "Override ticks to wait for consequences. 0 disables collection.")
+                    }
                 },
                 required = listOf("uuid")
             )
@@ -199,12 +253,21 @@ object ToolRegistrar {
         // 13. do_click_slot
         server.addTool(
             name = "do_click_slot",
-            description = "Click a slot in the current screen",
+            description = "Click a slot in the current screen. Waits 2 ticks for inventory_changed. Override with consequence_filter/consequence_wait.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     putJsonObject("slot_index") { put("type", "integer"); put("description", "Slot index to click") }
                     putJsonObject("button") { put("type", "integer"); put("description", "Mouse button (default: 0)") }
                     putJsonObject("shift") { put("type", "boolean"); put("description", "Use shift-click / QUICK_MOVE (default: false)") }
+                    putJsonObject("consequence_filter") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("description", "Override event types to collect. Replaces defaults.")
+                    }
+                    putJsonObject("consequence_wait") {
+                        put("type", "integer")
+                        put("description", "Override ticks to wait for consequences. 0 disables collection.")
+                    }
                 },
                 required = listOf("slot_index", "button")
             )
@@ -215,7 +278,21 @@ object ToolRegistrar {
         // 14. do_close_screen
         server.addTool(
             name = "do_close_screen",
-            description = "Close the currently open screen"
+            description = "Close the currently open screen. Waits 2 ticks for screen_closed, inventory_changed. Override with consequence_filter/consequence_wait.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("consequence_filter") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("description", "Override event types to collect. Replaces defaults.")
+                    }
+                    putJsonObject("consequence_wait") {
+                        put("type", "integer")
+                        put("description", "Override ticks to wait for consequences. 0 disables collection.")
+                    }
+                },
+                required = emptyList()
+            )
         ) { request ->
             handleAction(bridge, "close_screen", request.arguments)
         }
@@ -223,10 +300,19 @@ object ToolRegistrar {
         // 15. do_set_held_slot
         server.addTool(
             name = "do_set_held_slot",
-            description = "Set the player's held item slot",
+            description = "Set the player's held item slot. No consequence collection by default.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     putJsonObject("slot") { put("type", "integer"); put("description", "Hotbar slot index (0-8)") }
+                    putJsonObject("consequence_filter") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("description", "Override event types to collect. Replaces defaults.")
+                    }
+                    putJsonObject("consequence_wait") {
+                        put("type", "integer")
+                        put("description", "Override ticks to wait for consequences. 0 disables collection.")
+                    }
                 },
                 required = listOf("slot")
             )
@@ -237,10 +323,19 @@ object ToolRegistrar {
         // 16. do_send_chat
         server.addTool(
             name = "do_send_chat",
-            description = "Send a chat message",
+            description = "Send a chat message. Waits 3 ticks for chat_message. Override with consequence_filter/consequence_wait.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     putJsonObject("message") { put("type", "string"); put("description", "Chat message to send") }
+                    putJsonObject("consequence_filter") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("description", "Override event types to collect. Replaces defaults.")
+                    }
+                    putJsonObject("consequence_wait") {
+                        put("type", "integer")
+                        put("description", "Override ticks to wait for consequences. 0 disables collection.")
+                    }
                 },
                 required = listOf("message")
             )
@@ -253,10 +348,14 @@ object ToolRegistrar {
         // 17. run_command
         server.addTool(
             name = "run_command",
-            description = "Execute a server command",
+            description = "Execute a server command. Waits 3 ticks for all consequence types. Override with consequence_wait.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     putJsonObject("command") { put("type", "string"); put("description", "Server command to execute") }
+                    putJsonObject("consequence_wait") {
+                        put("type", "integer")
+                        put("description", "Override ticks to wait for consequences. 0 disables collection.")
+                    }
                 },
                 required = listOf("command")
             )
@@ -264,12 +363,15 @@ object ToolRegistrar {
             if (!bridge.isConnected) return@addTool notConnectedResult()
             try {
                 val args = request.arguments ?: JsonObject(emptyMap())
-                val command = args["command"]?.jsonPrimitive?.content
+                val waitValue = args["consequence_wait"]?.jsonPrimitive?.intOrNull ?: 3
+                val strippedArgs = JsonObject(args.filterKeys { it != "consequence_wait" })
+                val command = strippedArgs["command"]?.jsonPrimitive?.content
                     ?: return@addTool CallToolResult(content = listOf(TextContent("Error: missing 'command' parameter")), isError = true)
                 val result = bridge.sendRequest(
                     CommandRequest(
                         id = UUID.randomUUID().toString(),
-                        command = command
+                        command = command,
+                        consequenceWait = waitValue
                     )
                 )
                 CallToolResult(content = listOf(TextContent(result.toString())))
@@ -281,7 +383,7 @@ object ToolRegistrar {
         // 18. batch
         server.addTool(
             name = "batch",
-            description = "Execute multiple commands in sequence",
+            description = "Execute multiple read-only queries in a single request. Actions are not supported in batch — use individual do_ tools for actions that need consequence feedback.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     putJsonObject("commands") {
@@ -445,11 +547,25 @@ object ToolRegistrar {
         if (!bridge.isConnected) return notConnectedResult()
         return try {
             val args = arguments ?: JsonObject(emptyMap())
+            val defaults = DEFAULT_FILTERS[method]
+
+            // Extract overrides from args
+            val overrideFilter = args["consequence_filter"]?.jsonArray?.map { it.jsonPrimitive.content }
+            val overrideWait = args["consequence_wait"]?.jsonPrimitive?.intOrNull
+
+            // Strip consequence params before forwarding to mod
+            val strippedArgs = JsonObject(args.filterKeys { it != "consequence_filter" && it != "consequence_wait" })
+
+            val consequenceWait = overrideWait ?: defaults?.wait ?: 0
+            val consequenceFilter = overrideFilter ?: defaults?.filter
+
             val result = bridge.sendRequest(
                 ActionRequest(
                     id = UUID.randomUUID().toString(),
                     method = method,
-                    params = args
+                    params = strippedArgs,
+                    consequenceWait = consequenceWait,
+                    consequenceFilter = consequenceFilter
                 )
             )
             CallToolResult(content = listOf(TextContent(result.toString())))
