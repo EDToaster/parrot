@@ -1,5 +1,4 @@
 package dev.parrot.mod.engine.bridge
-
 import dev.parrot.mod.events.SubscriptionManager
 
 interface PlatformBridge {
