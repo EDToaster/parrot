@@ -90,13 +90,16 @@ class CommandQueue(
                 val handler = registry.get(message.method)
                     ?: return ErrorResponse(id = message.id, code = ErrorCode.UNKNOWN_METHOD.code, message = "Unknown method: ${message.method}")
                 try {
-                    val result = handler.handle(message.params, context)
-                    if (message.consequenceWait > 0 && consequenceCollector != null) {
-                        val handle = consequenceCollector.startCollecting(
+                    // Start collecting BEFORE executing so synchronous events (e.g. lever block_changed) are captured
+                    val handle = if (message.consequenceWait > 0 && consequenceCollector != null) {
+                        consequenceCollector.startCollecting(
                             startTick = tickCount,
                             tickWindow = message.consequenceWait,
                             filter = message.consequenceFilter
                         )
+                    } else null
+                    val result = handler.handle(message.params, context)
+                    if (handle != null) {
                         deferred.add(PendingCommand(
                             message = message, channel = pending.channel, future = pending.future,
                             collectionHandle = handle,
@@ -115,19 +118,22 @@ class CommandQueue(
                 val handler = registry.get("run_command")
                     ?: return ErrorResponse(id = message.id, code = ErrorCode.UNKNOWN_METHOD.code, message = "run_command handler not registered")
                 try {
-                    val params = buildJsonObject { put("command", message.command) }
-                    val result = handler.handle(params, context)
-                    if (message.consequenceWait > 0 && consequenceCollector != null) {
-                        val handle = consequenceCollector.startCollecting(
+                    // Start collecting BEFORE executing so synchronous events are captured
+                    val handle = if (message.consequenceWait > 0 && consequenceCollector != null) {
+                        consequenceCollector.startCollecting(
                             startTick = tickCount,
                             tickWindow = message.consequenceWait,
                             filter = null
                         )
+                    } else null
+                    val params = buildJsonObject { put("command", message.command) }
+                    val result = handler.handle(params, context)
+                    if (handle != null) {
                         deferred.add(PendingCommand(
                             message = message, channel = pending.channel, future = pending.future,
                             collectionHandle = handle,
                             deferredResult = DeferredResult.Command(
-                                output = result["output"]?.jsonPrimitive?.content ?: "",
+                                output = result["output"]?.toString() ?: "",
                                 returnValue = result["return_value"]?.jsonPrimitive?.intOrNull,
                                 tick = tickCount
                             )

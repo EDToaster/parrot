@@ -10,8 +10,9 @@ class RunCommandHandler : CommandHandler {
     override val isReadOnly = false
 
     override fun handle(params: JsonObject, context: CommandContext): JsonObject {
-        val command = params.stringOrNull("command")
-            ?: throw ParrotException(ErrorCode.INVALID_PARAMS, "Missing 'command' parameter")
+        val command = (params.stringOrNull("command")
+            ?: throw ParrotException(ErrorCode.INVALID_PARAMS, "Missing 'command' parameter"))
+            .removePrefix("/")
 
         val outputLines = mutableListOf<String>()
         val source = context.server.createCommandSourceStack()

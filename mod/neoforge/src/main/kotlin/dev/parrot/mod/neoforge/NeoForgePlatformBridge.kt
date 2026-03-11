@@ -11,7 +11,7 @@ class NeoForgePlatformBridge : PlatformBridge {
     }
 
     override fun registerEventListeners(subscriptionManager: SubscriptionManager) {
-        // Event listeners registered on client side via ParrotNeoForgeClient
+        NeoForgeEventDispatcher.register(subscriptionManager)
     }
 
     override fun getScreenReader(): ScreenReader? = clientScreenReader

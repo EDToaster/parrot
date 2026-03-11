@@ -11,7 +11,7 @@ class FabricPlatformBridge : PlatformBridge {
     }
 
     override fun registerEventListeners(subscriptionManager: SubscriptionManager) {
-        // Event listeners registered on client side via ParrotFabricClient
+        FabricEventDispatcher.register(subscriptionManager)
     }
 
     override fun getScreenReader(): ScreenReader? = clientScreenReader

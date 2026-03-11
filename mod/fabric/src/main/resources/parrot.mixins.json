@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "dev.parrot.mod.fabric.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ServerLevelMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
