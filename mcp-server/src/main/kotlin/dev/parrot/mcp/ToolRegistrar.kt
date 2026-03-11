@@ -11,6 +11,7 @@ import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -517,7 +518,151 @@ object ToolRegistrar {
             }
         }
 
-        // 22. list_methods
+        // 22. connection_status
+        server.addTool(
+            name = "connection_status",
+            description = "Check the current connection status to Minecraft. Returns connection state, game info, and connection file details."
+        ) { _ ->
+            try {
+                val connected = bridge.isConnected
+                val gameInfo = bridge.gameInfo
+                val connFile = Config.readConnectionFile()
+
+                val result = buildJsonObject {
+                    put("connected", connected)
+                    if (gameInfo != null) {
+                        putJsonObject("game_info") {
+                            put("minecraft_version", gameInfo.minecraftVersion)
+                            put("mod_loader", gameInfo.modLoader)
+                            put("mod_version", gameInfo.modVersion)
+                            put("server_type", gameInfo.serverType)
+                        }
+                    } else {
+                        put("game_info", null as String?)
+                    }
+                    if (connFile != null) {
+                        putJsonObject("connection_file") {
+                            put("exists", true)
+                            put("port", connFile.port)
+                            connFile.pid?.let { put("pid", it) }
+                            put("pid_alive", Config.isPidAlive(connFile.pid))
+                        }
+                    } else {
+                        putJsonObject("connection_file") {
+                            put("exists", false)
+                        }
+                    }
+                    if (!connected) {
+                        put("hint", "Not connected. Start Minecraft with: ./gradlew :mod:fabric:runClient &")
+                    }
+                }
+                CallToolResult(content = listOf(TextContent(result.toString())))
+            } catch (e: Exception) {
+                CallToolResult(content = listOf(TextContent("Error: ${e.message}")), isError = true)
+            }
+        }
+
+        // 23. wait_for_instance
+        server.addTool(
+            name = "wait_for_instance",
+            description = "Wait for a Minecraft instance to become available. Polls for a connection file and connects when found.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("timeout_seconds") { put("type", "integer"); put("description", "Max seconds to wait (default: 120)") }
+                    putJsonObject("poll_interval_ms") { put("type", "integer"); put("description", "Polling interval in ms (default: 2000)") }
+                },
+                required = emptyList()
+            )
+        ) { request ->
+            try {
+                val args = request.arguments ?: JsonObject(emptyMap())
+                val timeoutSeconds = args["timeout_seconds"]?.jsonPrimitive?.intOrNull ?: 120
+                val pollIntervalMs = args["poll_interval_ms"]?.jsonPrimitive?.intOrNull ?: 2000
+                val startTime = System.currentTimeMillis()
+                val timeoutMs = timeoutSeconds * 1000L
+
+                // If already connected, return immediately
+                if (bridge.isConnected) {
+                    val elapsed = System.currentTimeMillis() - startTime
+                    val gi = bridge.gameInfo
+                    val result = buildJsonObject {
+                        put("status", "connected")
+                        if (gi != null) {
+                            putJsonObject("connection_info") {
+                                put("minecraft_version", gi.minecraftVersion)
+                                put("mod_loader", gi.modLoader)
+                                put("mod_version", gi.modVersion)
+                                put("server_type", gi.serverType)
+                            }
+                        }
+                        put("elapsed_ms", elapsed)
+                        put("message", buildConnectionMessage(gi, elapsed))
+                    }
+                    return@addTool CallToolResult(content = listOf(TextContent(result.toString())))
+                }
+
+                // Snapshot current connection file state
+                val snapshot = Config.readConnectionFile()
+
+                // Poll loop
+                while (System.currentTimeMillis() - startTime < timeoutMs) {
+                    val connInfo = Config.readConnectionFile()
+                    if (connInfo != null) {
+                        val changed = snapshot == null ||
+                            connInfo.port != snapshot.port ||
+                            connInfo.pid != snapshot.pid
+
+                        if (changed && Config.isPidAlive(connInfo.pid)) {
+                            val newConfig = ParrotConfig(
+                                host = bridge.config.host,
+                                port = connInfo.port,
+                                token = connInfo.token
+                            )
+                            bridge.reconnectTo(newConfig)
+                            delay(1000)
+
+                            if (bridge.isConnected) {
+                                val elapsed = System.currentTimeMillis() - startTime
+                                val gi = bridge.gameInfo
+                                val result = buildJsonObject {
+                                    put("status", "connected")
+                                    putJsonObject("connection_info") {
+                                        put("port", connInfo.port)
+                                        connInfo.pid?.let { put("pid", it) }
+                                        if (gi != null) {
+                                            put("minecraft_version", gi.minecraftVersion)
+                                            put("mod_loader", gi.modLoader)
+                                            put("mod_version", gi.modVersion)
+                                            put("server_type", gi.serverType)
+                                        }
+                                    }
+                                    put("elapsed_ms", elapsed)
+                                    put("message", buildConnectionMessage(gi, elapsed))
+                                }
+                                return@addTool CallToolResult(content = listOf(TextContent(result.toString())))
+                            }
+                        }
+                    }
+                    delay(pollIntervalMs.toLong())
+                }
+
+                // Timeout
+                val result = buildJsonObject {
+                    put("status", "timeout")
+                    put("elapsed_ms", System.currentTimeMillis() - startTime)
+                    put("message", "Timed out waiting for Minecraft after ${timeoutSeconds}s")
+                }
+                CallToolResult(content = listOf(TextContent(result.toString())))
+            } catch (e: Exception) {
+                val result = buildJsonObject {
+                    put("status", "error")
+                    put("message", "Error: ${e.message}")
+                }
+                CallToolResult(content = listOf(TextContent(result.toString())), isError = true)
+            }
+        }
+
+        // 24. list_methods
         server.addTool(
             name = "list_methods",
             description = "List all available query and action methods"
@@ -574,8 +719,17 @@ object ToolRegistrar {
         }
     }
 
+    private fun buildConnectionMessage(gameInfo: GameInfo?, elapsedMs: Long): String {
+        val seconds = elapsedMs / 1000
+        return if (gameInfo != null) {
+            "Connected to Minecraft ${gameInfo.minecraftVersion} (${gameInfo.modLoader}) in ${seconds}s"
+        } else {
+            "Connected to Minecraft in ${seconds}s"
+        }
+    }
+
     private fun notConnectedResult() = CallToolResult(
-        content = listOf(TextContent("Not connected to Minecraft. Start a game with the Parrot mod installed.")),
+        content = listOf(TextContent("Not connected to Minecraft. Start the game with the Parrot mod, then use wait_for_instance to connect.")),
         isError = true
     )
 }
