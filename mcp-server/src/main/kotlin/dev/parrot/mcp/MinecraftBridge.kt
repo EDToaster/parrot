@@ -46,6 +46,7 @@ class MinecraftBridge(@Volatile var config: ParrotConfig) {
     }
 
     suspend fun connectWithRetry() {
+        retryJob = coroutineContext[Job]
         var delay = 1000L
         while (true) {
             try {
