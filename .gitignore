@@ -1,4 +1,3 @@
-.hive/
 .mcp.json
 .claude/worktrees/
 CLAUDE.local.md
@@ -9,4 +8,5 @@ build/
 buildSrc/build/
 buildSrc/.gradle/
 runs/
+
 .hive
