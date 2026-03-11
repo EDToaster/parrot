@@ -13,9 +13,21 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicBoolean
 
-class MinecraftBridge(private val config: ParrotConfig) {
+data class GameInfo(
+    val minecraftVersion: String,
+    val modLoader: String,
+    val modVersion: String,
+    val serverType: String
+)
+
+class MinecraftBridge(@Volatile var config: ParrotConfig) {
     private val _connected = AtomicBoolean(false)
     val isConnected: Boolean get() = _connected.get()
+
+    @Volatile var gameInfo: GameInfo? = null
+        private set
+
+    private var retryJob: Job? = null
 
     private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<JsonObject>>()
     private var session: WebSocketSession? = null
@@ -81,12 +93,13 @@ class MinecraftBridge(private val config: ParrotConfig) {
             System.err.println("[parrot-mcp] Reconnecting in ${delay}ms...")
             kotlinx.coroutines.delay(delay)
             delay = (delay * 2).coerceAtMost(30_000)
+            config = Config.discover()
         }
     }
 
     suspend fun sendRequest(message: ParrotMessage): JsonObject {
         if (!isConnected) {
-            throw IllegalStateException("Not connected to Minecraft")
+            throw IllegalStateException("Not connected to Minecraft. Start the game with the Parrot mod, then use wait_for_instance to connect.")
         }
         val deferred = CompletableDeferred<JsonObject>()
         pendingRequests[message.id] = deferred
@@ -116,6 +129,41 @@ class MinecraftBridge(private val config: ParrotConfig) {
         return all.sortedBy { it["tick"]?.jsonPrimitive?.longOrNull ?: 0L }
     }
 
+    fun reconnectTo(newConfig: ParrotConfig, scope: CoroutineScope) {
+        config = newConfig
+        retryJob?.cancel()
+        retryJob = scope.launch { connectWithRetry() }
+    }
+
+    suspend fun connectOnce(targetConfig: ParrotConfig): Boolean {
+        val probeClient = HttpClient(CIO) { install(WebSockets) }
+        return try {
+            var success = false
+            probeClient.webSocket(host = targetConfig.host, port = targetConfig.port, path = "/parrot") {
+                val helloId = UUID.randomUUID().toString()
+                val hello = Hello(id = helloId, authToken = targetConfig.token ?: "")
+                send(Frame.Text(ParrotJson.encodeToString<ParrotMessage>(hello)))
+
+                success = withTimeout(10_000) {
+                    for (frame in incoming) {
+                        if (frame is Frame.Text) {
+                            val msg = ParrotJson.decodeFromString<ParrotMessage>(frame.readText())
+                            if (msg is HelloAck && msg.id == helloId) {
+                                return@withTimeout true
+                            }
+                        }
+                    }
+                    false
+                }
+            }
+            success
+        } catch (_: Exception) {
+            false
+        } finally {
+            probeClient.close()
+        }
+    }
+
     fun disconnect() {
         session?.let {
             runBlocking { it.close(CloseReason(CloseReason.Codes.NORMAL, "Client disconnecting")) }
@@ -142,6 +190,12 @@ class MinecraftBridge(private val config: ParrotConfig) {
                     put("modVersion", message.modVersion)
                     put("serverType", message.serverType)
                 }
+                gameInfo = GameInfo(
+                    minecraftVersion = message.minecraftVersion,
+                    modLoader = message.modLoader,
+                    modVersion = message.modVersion,
+                    serverType = message.serverType
+                )
                 pendingRequests.remove(message.id)?.complete(result)
             }
 
@@ -255,6 +309,7 @@ class MinecraftBridge(private val config: ParrotConfig) {
     private fun onDisconnect() {
         _connected.set(false)
         session = null
+        gameInfo = null
         eventBuffer.clear()
         val exception = RuntimeException("Disconnected from Minecraft")
         for ((id, deferred) in pendingRequests) {

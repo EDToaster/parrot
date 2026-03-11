@@ -25,7 +25,7 @@ class BridgeCorrelationTest {
                 QueryRequest(id = "test-1", method = "get_player", params = JsonObject(emptyMap()))
             )
         }
-        assertEquals("Not connected to Minecraft", exception.message)
+        assertEquals("Not connected to Minecraft. Start the game with the Parrot mod, then use wait_for_instance to connect.", exception.message)
     }
 
     @Test
