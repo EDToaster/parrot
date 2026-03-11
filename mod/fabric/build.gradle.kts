@@ -21,7 +21,13 @@ loom {
     if (aw.exists()) { accessWidenerPath.set(aw) }
     mixin { defaultRefmapName.set("${project.property("mod_id")}.refmap.json") }
     runs {
-        named("client") { client(); configName = "Fabric Client"; ideConfigGenerated(true); runDir("runs/client") }
+        named("client") {
+            client(); configName = "Fabric Client"; ideConfigGenerated(true); runDir("runs/client")
+            System.getProperty("parrot.world")?.let {
+                programArg("--quickPlaySingleplayer")
+                programArg(it)
+            }
+        }
         named("server") { server(); configName = "Fabric Server"; ideConfigGenerated(true); runDir("runs/server") }
         create("gametest") {
             server()

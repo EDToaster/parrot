@@ -19,7 +19,12 @@ neoForge {
             systemProperty("neoforge.enabledGameTestNamespaces", mod_id)
             ideName = "NeoForge ${name.replaceFirstChar { it.uppercase() }} (${project.path})"
         }
-        create("client") { client() }
+        create("client") {
+            client()
+            System.getProperty("parrot.world")?.let {
+                programArguments.addAll(listOf("--quickPlaySingleplayer", it))
+            }
+        }
         create("server") { server() }
     }
     mods {
