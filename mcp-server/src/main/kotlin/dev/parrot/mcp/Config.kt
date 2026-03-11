@@ -10,6 +10,22 @@ object Config {
     private const val DEFAULT_HOST = "127.0.0.1"
     private const val DEFAULT_PORT = 25566
 
+    fun readConnectionFile(): ConnectionInfo? {
+        val connectionFile = File(System.getProperty("user.home"), ".parrot/connection.json")
+        if (!connectionFile.exists()) return null
+        return try {
+            ParrotJson.decodeFromString<ConnectionInfo>(connectionFile.readText())
+        } catch (e: Exception) {
+            System.err.println("[parrot-mcp] Failed to parse connection.json: ${e.message}")
+            null
+        }
+    }
+
+    fun isPidAlive(pid: Long?): Boolean {
+        if (pid == null) return true
+        return ProcessHandle.of(pid).map { it.isAlive }.orElse(false)
+    }
+
     fun discover(): ParrotConfig {
         val host = System.getenv("PARROT_HOST") ?: DEFAULT_HOST
 
@@ -21,14 +37,13 @@ object Config {
             return ParrotConfig(host = host, port = port, token = null)
         }
 
-        val connectionFile = File(System.getProperty("user.home"), ".parrot/connection.json")
-        if (connectionFile.exists()) {
-            try {
-                val info = ParrotJson.decodeFromString<ConnectionInfo>(connectionFile.readText())
+        val info = readConnectionFile()
+        if (info != null) {
+            if (isPidAlive(info.pid)) {
                 System.err.println("[parrot-mcp] Loaded connection.json: port=${info.port}, pid=${info.pid}")
                 return ParrotConfig(host = host, port = info.port, token = info.token)
-            } catch (e: Exception) {
-                System.err.println("[parrot-mcp] Failed to parse connection.json: ${e.message}")
+            } else {
+                System.err.println("[parrot-mcp] Stale connection.json: pid=${info.pid} is not alive, using defaults")
             }
         }
 
