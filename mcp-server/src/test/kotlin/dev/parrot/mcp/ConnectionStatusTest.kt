@@ -66,7 +66,7 @@ class ConnectionStatusTest {
         return handler.invoke(mockConnection, request)
     }
 
-    private fun withTempHome(block: (File) -> Unit) {
+    private suspend fun withTempHome(block: suspend (File) -> Unit) {
         val originalHome = System.getProperty("user.home")
         val tempDir = kotlin.io.path.createTempDirectory("parrot-test").toFile()
         try {

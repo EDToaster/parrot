@@ -11,6 +11,8 @@ import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -618,28 +620,31 @@ object ToolRegistrar {
                                 port = connInfo.port,
                                 token = connInfo.token
                             )
-                            bridge.reconnectTo(newConfig)
-                            delay(1000)
-
-                            if (bridge.isConnected) {
-                                val elapsed = System.currentTimeMillis() - startTime
-                                val gi = bridge.gameInfo
-                                val result = buildJsonObject {
-                                    put("status", "connected")
-                                    putJsonObject("connection_info") {
-                                        put("port", connInfo.port)
-                                        connInfo.pid?.let { put("pid", it) }
-                                        if (gi != null) {
-                                            put("minecraft_version", gi.minecraftVersion)
-                                            put("mod_loader", gi.modLoader)
-                                            put("mod_version", gi.modVersion)
-                                            put("server_type", gi.serverType)
+                            bridge.reconnectTo(newConfig, CoroutineScope(Dispatchers.IO))
+                            // Wait for the bridge to establish connection
+                            val connectDeadline = System.currentTimeMillis() + 15_000
+                            while (System.currentTimeMillis() < connectDeadline && System.currentTimeMillis() - startTime < timeoutMs) {
+                                delay(500)
+                                if (bridge.isConnected) {
+                                    val elapsed = System.currentTimeMillis() - startTime
+                                    val gi = bridge.gameInfo
+                                    val result = buildJsonObject {
+                                        put("status", "connected")
+                                        putJsonObject("connection_info") {
+                                            put("port", connInfo.port)
+                                            connInfo.pid?.let { put("pid", it) }
+                                            if (gi != null) {
+                                                put("minecraft_version", gi.minecraftVersion)
+                                                put("mod_loader", gi.modLoader)
+                                                put("mod_version", gi.modVersion)
+                                                put("server_type", gi.serverType)
+                                            }
                                         }
+                                        put("elapsed_ms", elapsed)
+                                        put("message", buildConnectionMessage(gi, elapsed))
                                     }
-                                    put("elapsed_ms", elapsed)
-                                    put("message", buildConnectionMessage(gi, elapsed))
+                                    return@addTool CallToolResult(content = listOf(TextContent(result.toString())))
                                 }
-                                return@addTool CallToolResult(content = listOf(TextContent(result.toString())))
                             }
                         }
                     }
