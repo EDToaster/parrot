@@ -11,9 +11,6 @@ import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -607,13 +604,11 @@ object ToolRegistrar {
                 // Track last config we attempted to connect with
                 var lastAttemptedPort: Int? = null
                 var lastAttemptedPid: Long? = null
-                var reconnectScope: CoroutineScope? = null
 
                 // Poll loop
                 while (System.currentTimeMillis() - startTime < timeoutMs) {
                     // Check if bridge connected (e.g. from background retry)
                     if (bridge.isConnected) {
-                        reconnectScope?.let { it.coroutineContext[Job]?.cancel() }
                         val elapsed = System.currentTimeMillis() - startTime
                         val gi = bridge.gameInfo
                         val connInfo = Config.readConnectionFile()
@@ -645,20 +640,13 @@ object ToolRegistrar {
                                 port = connInfo.port,
                                 token = connInfo.token
                             )
-                            // Cancel previous reconnect scope before creating a new one
-                            reconnectScope?.let { it.coroutineContext[Job]?.cancel() }
-                            val newScope = CoroutineScope(Dispatchers.IO + Job())
-                            reconnectScope = newScope
-                            bridge.reconnectTo(newConfig, newScope)
+                            bridge.reconnectTo(newConfig)
                             lastAttemptedPort = connInfo.port
                             lastAttemptedPid = connInfo.pid
                         }
                     }
                     delay(pollIntervalMs.toLong())
                 }
-
-                // Cleanup on timeout
-                reconnectScope?.let { it.coroutineContext[Job]?.cancel() }
 
                 // Timeout
                 val result = buildJsonObject {

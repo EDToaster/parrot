@@ -29,6 +29,7 @@ class MinecraftBridge(@Volatile var config: ParrotConfig) {
         private set
 
     private var retryJob: Job? = null
+    private val bridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<JsonObject>>()
     private var session: WebSocketSession? = null
@@ -131,10 +132,10 @@ class MinecraftBridge(@Volatile var config: ParrotConfig) {
         return all.sortedBy { it["tick"]?.jsonPrimitive?.longOrNull ?: 0L }
     }
 
-    fun reconnectTo(newConfig: ParrotConfig, scope: CoroutineScope) {
+    fun reconnectTo(newConfig: ParrotConfig) {
         config = newConfig
         retryJob?.cancel()
-        retryJob = scope.launch { connectWithRetry() }
+        retryJob = bridgeScope.launch { connectWithRetry() }
     }
 
     suspend fun connectOnce(targetConfig: ParrotConfig): Boolean {
