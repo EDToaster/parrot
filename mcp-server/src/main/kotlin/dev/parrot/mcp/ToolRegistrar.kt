@@ -13,6 +13,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -603,53 +604,61 @@ object ToolRegistrar {
                     return@addTool CallToolResult(content = listOf(TextContent(result.toString())))
                 }
 
-                // Snapshot current connection file state
-                val snapshot = Config.readConnectionFile()
+                // Track last config we attempted to connect with
+                var lastAttemptedPort: Int? = null
+                var lastAttemptedPid: Long? = null
+                var reconnectScope: CoroutineScope? = null
 
                 // Poll loop
                 while (System.currentTimeMillis() - startTime < timeoutMs) {
-                    val connInfo = Config.readConnectionFile()
-                    if (connInfo != null) {
-                        val changed = snapshot == null ||
-                            connInfo.port != snapshot.port ||
-                            connInfo.pid != snapshot.pid
+                    // Check if bridge connected (e.g. from background retry)
+                    if (bridge.isConnected) {
+                        reconnectScope?.let { it.coroutineContext[Job]?.cancel() }
+                        val elapsed = System.currentTimeMillis() - startTime
+                        val gi = bridge.gameInfo
+                        val connInfo = Config.readConnectionFile()
+                        val result = buildJsonObject {
+                            put("status", "connected")
+                            putJsonObject("connection_info") {
+                                connInfo?.let { put("port", it.port) }
+                                connInfo?.pid?.let { put("pid", it) }
+                                if (gi != null) {
+                                    put("minecraft_version", gi.minecraftVersion)
+                                    put("mod_loader", gi.modLoader)
+                                    put("mod_version", gi.modVersion)
+                                    put("server_type", gi.serverType)
+                                }
+                            }
+                            put("elapsed_ms", elapsed)
+                            put("message", buildConnectionMessage(gi, elapsed))
+                        }
+                        return@addTool CallToolResult(content = listOf(TextContent(result.toString())))
+                    }
 
-                        if (changed && Config.isPidAlive(connInfo.pid)) {
+                    val connInfo = Config.readConnectionFile()
+                    if (connInfo != null && Config.isPidAlive(connInfo.pid)) {
+                        // Only call reconnectTo if this is a new/different instance
+                        val isNewTarget = connInfo.port != lastAttemptedPort || connInfo.pid != lastAttemptedPid
+                        if (isNewTarget) {
                             val newConfig = ParrotConfig(
                                 host = bridge.config.host,
                                 port = connInfo.port,
                                 token = connInfo.token
                             )
-                            bridge.reconnectTo(newConfig, CoroutineScope(Dispatchers.IO))
-                            // Wait for the bridge to establish connection
-                            val connectDeadline = System.currentTimeMillis() + 15_000
-                            while (System.currentTimeMillis() < connectDeadline && System.currentTimeMillis() - startTime < timeoutMs) {
-                                delay(500)
-                                if (bridge.isConnected) {
-                                    val elapsed = System.currentTimeMillis() - startTime
-                                    val gi = bridge.gameInfo
-                                    val result = buildJsonObject {
-                                        put("status", "connected")
-                                        putJsonObject("connection_info") {
-                                            put("port", connInfo.port)
-                                            connInfo.pid?.let { put("pid", it) }
-                                            if (gi != null) {
-                                                put("minecraft_version", gi.minecraftVersion)
-                                                put("mod_loader", gi.modLoader)
-                                                put("mod_version", gi.modVersion)
-                                                put("server_type", gi.serverType)
-                                            }
-                                        }
-                                        put("elapsed_ms", elapsed)
-                                        put("message", buildConnectionMessage(gi, elapsed))
-                                    }
-                                    return@addTool CallToolResult(content = listOf(TextContent(result.toString())))
-                                }
-                            }
+                            // Cancel previous reconnect scope before creating a new one
+                            reconnectScope?.let { it.coroutineContext[Job]?.cancel() }
+                            val newScope = CoroutineScope(Dispatchers.IO + Job())
+                            reconnectScope = newScope
+                            bridge.reconnectTo(newConfig, newScope)
+                            lastAttemptedPort = connInfo.port
+                            lastAttemptedPid = connInfo.pid
                         }
                     }
                     delay(pollIntervalMs.toLong())
                 }
+
+                // Cleanup on timeout
+                reconnectScope?.let { it.coroutineContext[Job]?.cancel() }
 
                 // Timeout
                 val result = buildJsonObject {
